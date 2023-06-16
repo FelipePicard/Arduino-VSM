@@ -1,17 +1,22 @@
-// defining Arduino input and output pins
 #define buzzer 5
 
 #define r_led A2
-#define r_in 4
-#define r_cup 6
+#define r_in A4
+#define r_cup A7
 
 #define l_led A3
-#define l_in 2
-#define l_cup 3
+#define l_in A5
+#define l_cup A6
 
-#define earth 7
-#define earth_led A0
+//#define earth 7
+#define l_earth_led 11
+#define r_earth_led 4
 
+int thresh = 100;
+
+int cup_mean(int c_val);
+
+int cup_thresh = 100;
 // declaring variables
 int r_val;
 int previous_r_val = HIGH;
@@ -57,22 +62,23 @@ void setup() {
   pinMode(r_cup, INPUT_PULLUP);
   pinMode(l_in, INPUT_PULLUP);
   pinMode(l_cup, INPUT_PULLUP);
-  pinMode(earth, INPUT_PULLUP);
-  pinMode(earth_led, OUTPUT);
-  //Serial.begin(9600);
+//  pinMode(earth, INPUT_PULLUP);
+  pinMode(r_earth_led, OUTPUT);
+  pinMode(l_earth_led, OUTPUT);
+  Serial.begin(115200);
 }
 
 void loop() {
-  r_val = digitalRead(r_in);
-  l_val = digitalRead(l_in);
+  r_val = analogRead(r_in);
+  l_val = analogRead(l_in);
 
   // ct (current time) equals millis(), which is the time the Arduino is running in milliseconds
   unsigned long ct = millis();
   
-  r_cup_val = digitalRead(r_cup);
-  l_cup_val = digitalRead(l_cup);
+  r_cup_val = analogRead(r_cup);
+  l_cup_val = analogRead(l_cup);
 
-  earth_val = digitalRead(earth);
+  //arth_val = digitalRead(earth);
 
   //if(r_cup_val == LOW && cup_touch == false){
   //  cup_touch = true;
@@ -84,25 +90,22 @@ void loop() {
 
 // right side first
   // if right epee button has been pressed (r_val == LOW means right epee button has been pressed) and it wasn't pressed before, and left epee button has not been pressed (!l_first means l_first = false)
-  if(r_val == LOW && previous_r_val == HIGH && !l_first){
+  if(r_val < thresh && previous_r_val == HIGH && !l_first){
     cup_touch = false;
     m = true;
     trigger = 1;
     // check give points if cup or piste are not receiving current (in this case, HIGH, means the l_cup and earth aren't receiving current)
-    if(l_cup_val == HIGH && earth_val == HIGH){
+   // if(l_cup_val > 300 && l_cup_val < cup_thresh && earth_val == HIGH){
       // give points to right player
       r_points++;
       trigger = 2;
       // previous right timer (prt) equals current time. This will "reset" our r_timer, which is defined some lines bellow as: r_timer = ct - prt. We will use this timer to see if there was a double touch
       prt = ct;
-      // turn on right LED and buzzer
-      //digitalWrite(r_led, HIGH);
-      //digitalWrite(buzzer, HIGH);
       // right player was the first to touch
       r_first = true;
       // previous right value is LOW (meaning that the button was pressed). This is done to avoid this if statement from ruinning indefinetly
       previous_r_val = LOW;
-    }
+   // }
   }
 
   // since prt = ct, the timer will be restarted and will count from 0 to 40 milliseconds (the time for the double touch to be awarded)
@@ -112,34 +115,31 @@ void loop() {
     trigger = 4;
     //digitalWrite(r_led, HIGH);
     // if left player's button has been pressed
-    if(l_val == LOW){
+    if(l_val < thresh){
       trigger = 5;
       // and it wasn't cup or ground
-      if(r_cup_val == HIGH && earth_val == HIGH){
+    //  if(r_cup_val == HIGH && earth_val == HIGH){
         trigger = 6;
       // award points to left player
       l_points++;
       //digitalWrite(l_led, HIGH);
-      }
+    //  }
     }
-    if(r_cup_val == LOW && cup_touch == false){
+    if(r_cup_val < cup_thresh && cup_touch == false){
       trigger = 7;
-    cup_touch = true;
-  }
-
-  if(l_cup_val == LOW && cup_touch == false){
-    trigger = 8;
+    previous_l_val = LOW;
+    previous_r_points = r_points;
     cup_touch = true;
   }
   }
 
 // left side first
   
-  if(l_val == LOW && previous_l_val == HIGH && r_first == false){
+  if(l_val < thresh && previous_l_val == HIGH && r_first == false){
     trigger = 9;
     cup_touch = false;
     m = true;
-    if(r_cup_val == 1 && earth_val == 1){
+  //  if(r_cup_val > 300 && r_cup_val < cup_thresh && earth_val == 1){
       trigger = 10;
       l_points++;
       plt = ct;
@@ -147,7 +147,7 @@ void loop() {
       //digitalWrite(buzzer, HIGH);
       l_first = true;
       previous_l_val = LOW;
-    }
+  //  }
   }
 
   l_timer = ct - plt;
@@ -155,21 +155,19 @@ void loop() {
   if(l_timer < threshold){
     trigger = 11;
     //digitalWrite(l_led, HIGH);
-    if(r_val == LOW){
+    if(r_val < thresh){
       trigger = 12;
-      if(l_cup_val == HIGH && earth_val == HIGH){
+    //  if(l_cup_val == HIGH && earth_val == HIGH){
         trigger = 13;
       r_points++;
       //digitalWrite(r_led, HIGH);
-      }
+    //  }
     }
-    if(r_cup_val == LOW && cup_touch == false){
-      trigger = 14;
-    cup_touch = true;
-  }
 
-  if(l_cup_val == LOW && cup_touch == false){
+  if(l_cup_val < cup_thresh && cup_touch == false){
     trigger = 15;
+    previous_r_val = LOW;
+    previous_l_points = l_points;
     cup_touch = true;
   }
   }
@@ -257,29 +255,36 @@ void loop() {
   //  }
   
   // cup grounding LEDs
-  if(r_cup_val == LOW || l_cup_val == LOW){
-    digitalWrite(earth_led, HIGH);
+  if(l_cup_val < cup_thresh){
+    digitalWrite(r_earth_led, HIGH);
+    //digitalWrite(l_earth_led, HIGH);
+  }
+
+  if(r_cup_val < cup_thresh){
+    digitalWrite(l_earth_led, HIGH);
+    //digitalWrite(l_earth_led, HIGH);
   }
   
-  else if(r_cup_val == HIGH || l_cup_val == HIGH){
-    digitalWrite(earth_led, LOW);
+  else if(r_cup_val > cup_thresh  && l_cup_val > cup_thresh){
+    digitalWrite(r_earth_led, LOW);
+    digitalWrite(l_earth_led, LOW);
   }
 
   //Serial.print("l_cup:  "); Serial.println(cup_touch);
   //Serial.print("trigger:  "); Serial.println(trigger);
   //Serial.print("r_val:  "); Serial.println(previous_r_val);
   // uncomment for debugging
-  /*
-  Serial.print("right:  "); Serial.print(r_val); Serial.print("     touch?   "); Serial.println(previous_r_val);
   
-  Serial.print("left:   "); Serial.print(l_points); Serial.print("     touch?   "); Serial.println(l_first);
-  Serial.println(""); Serial.println("");
-  Serial.print("r_cup:  "); Serial.println(r_cup_val);
-  Serial.print("l_cup:  "); Serial.println(l_cup_val);
-  Serial.print("earth:  "); Serial.println(earth_val);
+  Serial.print("right:  "); Serial.print(r_points); Serial.print("     prev?   "); Serial.println(previous_r_points);
+  
+  Serial.print("left:   "); Serial.print(l_points); Serial.print("     prev?   "); Serial.println(previous_l_points);
+  //Serial.println(""); Serial.println("");
+  //Serial.print("r_cup:  "); Serial.println(r_cup_val);
+  //Serial.print("l_cup:  "); Serial.println(l_cup_val);
+  //Serial.print("earth:  "); Serial.println(earth_val);
   //Serial.print("trigger:  "); Serial.println(trigger);
-  Serial.print("r_timer:  "); Serial.println(r_timer);
-  Serial.print("l_timer:  "); Serial.println(l_timer);
-  Serial.println(""); Serial.println(""); Serial.println(""); Serial.println("");
-  */
+  //Serial.print("r_timer:  "); Serial.println(r_timer);
+  //Serial.print("l_timer:  "); Serial.println(l_timer);
+  //Serial.println(""); Serial.println(""); Serial.println(""); Serial.println("");
+  //
 }
